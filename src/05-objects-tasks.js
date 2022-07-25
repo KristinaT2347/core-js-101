@@ -6,7 +6,6 @@
  *                                                                                                *
  ************************************************************************************************ */
 
-
 /**
  * Returns the rectangle object with width and height parameters and getArea() method
  *
@@ -20,10 +19,14 @@
  *    console.log(r.height);      // => 20
  *    console.log(r.getArea());   // => 200
  */
-function Rectangle(/* width, height */) {
-  throw new Error('Not implemented');
-}
+function Rectangle(width, height) {
+  this.width = width;
+  this.height = height;
 
+  this.getArea = function getArea() {
+    return this.width * this.height;
+  };
+}
 
 /**
  * Returns the JSON representation of specified object
@@ -35,10 +38,9 @@ function Rectangle(/* width, height */) {
  *    [1,2,3]   =>  '[1,2,3]'
  *    { width: 10, height : 20 } => '{"height":10,"width":20}'
  */
-function getJSON(/* obj */) {
-  throw new Error('Not implemented');
+function getJSON(obj) {
+  return JSON.stringify(obj);
 }
-
 
 /**
  * Returns the object of specified type from JSON representation
@@ -51,10 +53,9 @@ function getJSON(/* obj */) {
  *    const r = fromJSON(Circle.prototype, '{"radius":10}');
  *
  */
-function fromJSON(/* proto, json */) {
-  throw new Error('Not implemented');
+function fromJSON(proto, json) {
+  return Object.assign(Object.create(proto), JSON.parse(json));
 }
-
 
 /**
  * Css selectors builder
@@ -73,7 +74,7 @@ function fromJSON(/* proto, json */) {
  * Each selector should have the stringify() method to output the string representation
  * according to css specification.
  *
- * Provided cssSelectorBuilder should be used as facade only to create your own classes,
+ * Provided cssSelectorBuilder should be used asd facade only to create your own classes,
  * for example the first method of cssSelectorBuilder can be like this:
  *   element: function(value) {
  *       return new MySuperBaseElementSelector(...)...
@@ -110,36 +111,126 @@ function fromJSON(/* proto, json */) {
  *  For more examples see unit tests.
  */
 
+class Builder {
+  constructor(base, newValue, fields) {
+    this.value = newValue || '';
+    this.withElement = (base && base.withElement) || false;
+    this.withId = (base && base.withId) || false;
+    this.withClass = (base && base.withClass) || false;
+    this.withAttribute = (base && base.withAttribute) || false;
+    this.withPseudoClass = (base && base.withPseudoClass) || false;
+    this.withPseudoElement = (base && base.withPseudoElement) || false;
+
+    if (fields) {
+      Object.assign(this, fields);
+    }
+  }
+
+  element(value) {
+    if (this.withElement) {
+      throw new Error(
+        'Element, id and pseudo-element should not occur more then one time inside the selector',
+      );
+    }
+    if (
+      this.withId
+      || this.withClass
+      || this.withAttribute
+      || this.withPseudoClass
+      || this.withPseudoElement
+    ) {
+      throw new Error(
+        'Selector parts should be arranged in the following order: element, id, class, attribute, pseudo-class, pseudo-element',
+      );
+    }
+    return new Builder(this, this.value + value, { withElement: true });
+  }
+
+  id(value) {
+    if (this.withId) {
+      throw new Error(
+        'Element, id and pseudo-element should not occur more then one time inside the selector',
+      );
+    }
+    if (
+      this.withClass
+      || this.withAttribute
+      || this.withPseudoClass
+      || this.withPseudoElement
+    ) {
+      throw new Error(
+        'Selector parts should be arranged in the following order: element, id, class, attribute, pseudo-class, pseudo-element',
+      );
+    }
+    return new Builder(this, `${this.value}#${value}`, { withId: true });
+  }
+
+  class(value) {
+    if (this.withAttribute || this.withPseudoClass || this.withPseudoElement) {
+      throw new Error(
+        'Selector parts should be arranged in the following order: element, id, class, attribute, pseudo-class, pseudo-element',
+      );
+    }
+    return new Builder(this, `${this.value}.${value}`, { withClass: true });
+  }
+
+  attr(value) {
+    if (this.withPseudoClass || this.withPseudoElement) {
+      throw new Error(
+        'Selector parts should be arranged in the following order: element, id, class, attribute, pseudo-class, pseudo-element',
+      );
+    }
+    return new Builder(this, `${this.value}[${value}]`, {
+      withAttribute: true,
+    });
+  }
+
+  pseudoClass(value) {
+    if (this.withPseudoElement) {
+      throw new Error(
+        'Selector parts should be arranged in the following order: element, id, class, attribute, pseudo-class, pseudo-element',
+      );
+    }
+    return new Builder(this, `${this.value}:${value}`, {
+      withPseudoClass: true,
+    });
+  }
+
+  pseudoElement(value) {
+    if (this.withPseudoElement) {
+      throw new Error(
+        'Element, id and pseudo-element should not occur more then one time inside the selector',
+      );
+    }
+    return new Builder(this, `${this.value}::${value}`, {
+      withPseudoElement: true,
+    });
+  }
+
+  combine(selector1, combinator, selector2) {
+    return new Builder(
+      this,
+      `${selector1.stringify()} ${combinator} ${selector2.stringify()}`,
+    );
+  }
+
+  stringify() {
+    return this.value;
+  }
+}
+
+const emptyBuilder = new Builder();
+
 const cssSelectorBuilder = {
-  element(/* value */) {
-    throw new Error('Not implemented');
-  },
-
-  id(/* value */) {
-    throw new Error('Not implemented');
-  },
-
-  class(/* value */) {
-    throw new Error('Not implemented');
-  },
-
-  attr(/* value */) {
-    throw new Error('Not implemented');
-  },
-
-  pseudoClass(/* value */) {
-    throw new Error('Not implemented');
-  },
-
-  pseudoElement(/* value */) {
-    throw new Error('Not implemented');
-  },
-
-  combine(/* selector1, combinator, selector2 */) {
-    throw new Error('Not implemented');
-  },
+  element: emptyBuilder.element.bind(emptyBuilder),
+  id: emptyBuilder.id.bind(emptyBuilder),
+  class: emptyBuilder.class.bind(emptyBuilder),
+  attr: emptyBuilder.attr.bind(emptyBuilder),
+  pseudoClass: emptyBuilder.pseudoClass.bind(emptyBuilder),
+  pseudoElement: emptyBuilder.pseudoElement.bind(emptyBuilder),
+  combine: emptyBuilder.combine.bind(emptyBuilder),
+  stringify: emptyBuilder.stringify.bind(emptyBuilder),
 };
-
 
 module.exports = {
   Rectangle,
